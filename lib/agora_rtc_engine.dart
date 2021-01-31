@@ -429,6 +429,18 @@ class AgoraRtcEngine {
     await _channel.invokeMethod('destroy');
   }
 
+  /// 远端截图
+  static Future<void> snapshootRemote() async {
+    print('flutter invoke snapshootRemote');
+    await _channel.invokeMethod('snapshootRemote');
+  }
+
+  /// 本地截图
+  static Future<void> snapshootLocal() async {
+    print('flutter invoke snapshootLocal');
+    await _channel.invokeMethod('snapshootLocal');
+  }
+
   /// Sets the channel profile.
   ///
   /// RtcEngine needs to know the application scenario to set the appropriate channel profile to apply different optimization methods.

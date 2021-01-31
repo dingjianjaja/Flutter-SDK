@@ -44,6 +44,18 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Agora Flutter SDK'),
+          actions: [
+            FlatButton(
+                onPressed: () {
+                  AgoraRtcEngine.snapshootLocal();
+                },
+                child: (Text('本地截图'))),
+            FlatButton(
+                onPressed: () {
+                  AgoraRtcEngine.snapshootRemote();
+                },
+                child: (Text('远端截图'))),
+          ],
         ),
         body: Container(
           child: Column(
@@ -88,7 +100,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _initAgoraRtcEngine() async {
-    AgoraRtcEngine.create('YOUR APP ID');
+    AgoraRtcEngine.create('e4e73600873040fe8faf3d5f91faf881');
 
     AgoraRtcEngine.enableVideo();
     AgoraRtcEngine.enableAudio();
@@ -146,18 +158,21 @@ class _MyAppState extends State<MyApp> {
     };
   }
 
-  void _toggleChannel() {
-    setState(() async {
-      if (_isInChannel) {
-        _isInChannel = false;
-        await AgoraRtcEngine.leaveChannel();
-        await AgoraRtcEngine.stopPreview();
-      } else {
-        _isInChannel = true;
-        await AgoraRtcEngine.startPreview();
-        await AgoraRtcEngine.joinChannel(null, 'flutter', null, 0);
-      }
-    });
+  void _toggleChannel() async {
+    if (_isInChannel) {
+      _isInChannel = false;
+      await AgoraRtcEngine.leaveChannel();
+      await AgoraRtcEngine.stopPreview();
+    } else {
+      _isInChannel = true;
+      await AgoraRtcEngine.startPreview();
+      await AgoraRtcEngine.joinChannel(
+          '006e4e73600873040fe8faf3d5f91faf881IACnsGXTuOFfyZ6FZNbREEitJS0HHNs2IfBg1ThhMGxXCop+KioAAAAAEAAH/YchccgXYAEAAQBxyBdg',
+          'flutter',
+          null,
+          0);
+    }
+    setState(() {});
   }
 
   Widget _viewRows() {

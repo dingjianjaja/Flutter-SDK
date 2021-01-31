@@ -1,5 +1,6 @@
 #import "AgoraRtcEnginePlugin.h"
-#import <AgoraRtcEngineKit/AgoraRtcEngineKit.h>
+#import <AgoraRtcKit/AgoraRtcEngineKit.h>
+#import "AgoraMediaDataPlugin.h"
 
 @interface AgoraRendererView ()
 @property(nonatomic, strong) UIView *renderView;
@@ -24,16 +25,37 @@
 @interface AgoraRenderViewFactory : NSObject <FlutterPlatformViewFactory>
 @end
 
-@interface AgoraRtcEnginePlugin () <FlutterStreamHandler, AgoraRtcEngineDelegate>
+@interface AgoraRtcEnginePlugin () <FlutterStreamHandler, AgoraRtcEngineDelegate,AgoraAudioDataPluginDelegate,AgoraVideoDataPluginDelegate,AgoraPacketDataPluginDelegate>
 @property(strong, nonatomic) AgoraRtcEngineKit *agoraRtcEngine;
 @property(strong, nonatomic) FlutterMethodChannel *methodChannel;
 @property(strong, nonatomic) FlutterEventChannel *eventChannel;
 @property(strong, nonatomic) FlutterEventSink eventSink;
 @property(strong, nonatomic) NSMutableDictionary *rendererViews;
+@property(strong, nonatomic) AgoraMediaDataPlugin *agoraMediaDataPlugin;
+
 @end
 
 @implementation AgoraRtcEnginePlugin
 #pragma mark - renderer views
+// 原始视频文件 工具
+- (AgoraMediaDataPlugin *)agoraMediaDataPlugin{
+    if (_agoraMediaDataPlugin == nil) {
+        _agoraMediaDataPlugin = [AgoraMediaDataPlugin mediaDataPluginWithAgoraKit:self.agoraRtcEngine];
+        
+        // audio
+        [_agoraMediaDataPlugin registerAudioRawDataObserver:ObserverAudioTypeRecordAudio|ObserverAudioTypePlaybackAudioFrameBeforeMixing|ObserverAudioTypeMixedAudio|ObserverAudioTypePlaybackAudio];
+        _agoraMediaDataPlugin.audioDelegate = self;
+        
+        // video
+        [_agoraMediaDataPlugin registerVideoRawDataObserver:ObserverVideoTypeCaptureVideo|ObserverVideoTypeRenderVideo|ObserverVideoTypePreEncodeVideo];
+        _agoraMediaDataPlugin.videoDelegate = self;
+        
+        // packet
+        [_agoraMediaDataPlugin registerPacketRawDataObserver:ObserverPacketTypeSendAudio|ObserverPacketTypeSendVideo|ObserverPacketTypeReceiveAudio|ObserverPacketTypeReceiveVideo];
+        _agoraMediaDataPlugin.packetDelegate = self;
+    }
+    return _agoraMediaDataPlugin;
+}
 
 + (instancetype)sharedPlugin {
     static AgoraRtcEnginePlugin *plugin = nil;
@@ -119,11 +141,30 @@
     if ([@"create" isEqualToString:method]) {
         NSString *appId = [self stringFromArguments:params key:@"appId"];
         self.agoraRtcEngine = [AgoraRtcEngineKit sharedEngineWithAppId:appId delegate:self];
+        self.agoraMediaDataPlugin;
+        
+        [self.agoraRtcEngine setRecordingAudioFrameParametersWithSampleRate:44100 channel:1 mode:AgoraAudioRawFrameOperationModeReadWrite samplesPerCall:4410];
+        [self.agoraRtcEngine setMixedAudioFrameParametersWithSampleRate:44100 samplesPerCall:4410];
+        [self.agoraRtcEngine setPlaybackAudioFrameParametersWithSampleRate:44100 channel:1 mode:AgoraAudioRawFrameOperationModeReadWrite samplesPerCall:4410];
+        
+        
         [_eventChannel setStreamHandler:self];
         result(nil);
     } else if ([@"destroy" isEqualToString:method]) {
         self.agoraRtcEngine = nil;
         [AgoraRtcEngineKit destroy];
+        result(nil);
+    }else if ([@"snapshootRemote" isEqualToString:method]) {
+        NSLog(@"ios 远端截图");
+        [self.agoraMediaDataPlugin remoteSnapshotWithUid:nil image:^(AGImage * _Nonnull image) {
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+        }];
+        result(nil);
+    }else if ([@"snapshootLocal" isEqualToString:method]) {
+        NSLog(@"ios 本地截图");
+        [self.agoraMediaDataPlugin localSnapshot:^(AGImage * _Nonnull image) {
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil);
+                }];
         result(nil);
     } else if ([@"setChannelProfile" isEqualToString:method]) {
         NSInteger profile = [self intFromArguments:params key:@"profile"];
@@ -1099,6 +1140,54 @@
 // - (void)rtcEngineLocalAudioMixingDidFinish:(AgoraRtcEngineKit *_Nonnull)engine {
 //   [self sendEvent:@"onLocalAudioMixingFinished" params:nil];
 // }
+
+#pragma mark -- delegate
+#pragma videoDelegate
+- (AgoraVideoRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin didCapturedVideoRawData:(AgoraVideoRawData *)videoRawData{
+    return videoRawData;
+}
+
+- (AgoraVideoRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin willRenderVideoRawData:(AgoraVideoRawData *)videoRawData ofUid:(uint)uid{
+    return videoRawData;
+}
+
+-(AgoraVideoRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin willPreEncodeVideoRawData:(AgoraVideoRawData *)videoRawData{
+    return videoRawData;
+}
+
+#pragma audioDelegate
+- (AgoraAudioRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin didRecordAudioRawData:(AgoraAudioRawData *)audioRawData{
+    return audioRawData;
+}
+
+- (AgoraAudioRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin willPlaybackAudioRawData:(AgoraAudioRawData *)audioRawData{
+    return audioRawData;
+}
+
+- (AgoraAudioRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin willPlaybackBeforeMixingAudioRawData:(AgoraAudioRawData *)audioRawData ofUid:(uint)uid{
+    return audioRawData;
+}
+
+- (AgoraAudioRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin didMixedAudioRawData:(AgoraAudioRawData *)audioRawData{
+    return audioRawData;
+}
+
+#pragma packetDelegate
+- (AgoraPacketRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin willSendAudioPacket:(AgoraPacketRawData *)audioPacket{
+    return audioPacket;
+}
+
+- (AgoraPacketRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin willSendVideoPacket:(AgoraPacketRawData *)videoPacket{
+    return videoPacket;
+}
+
+- (AgoraPacketRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin didReceivedAudioPacket:(AgoraPacketRawData *)audioPacket{
+    return audioPacket;
+}
+
+- (AgoraPacketRawData *)mediaDataPlugin:(AgoraMediaDataPlugin *)mediaDataPlugin didReceivedVideoPacket:(AgoraPacketRawData *)videoPacket{
+    return videoPacket;
+}
 
 #pragma mark - helper
 
